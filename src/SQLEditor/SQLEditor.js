@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useCombobox } from 'downshift';
 import { isEmpty, keys, without } from 'lodash';
 import { getSearchKeywords, replaceLast } from './utils';
@@ -20,25 +20,32 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
 
   const {
     isOpen,
-    openMenu,
-    closeMenu,
     getMenuProps,
     getInputProps,
     highlightedIndex,
-    setHighlightedIndex,
     getItemProps,
-    selectedItem,
     selectItem,
+    setHighlightedIndex,
   } = useCombobox({
     items: suggestions,
     itemToString: (item) => item?.value || '',
     onInputValueChange: ({ inputValue }) => {
       // Update the SQL query with the current input value
-      console.log('inputValue: ', inputValue, ', sqlQuery: ', sqlQuery);
+      const time = Date.now();
       setSqlQuery(inputValue);
 
       // Keywords arrary
       const searchKeywords = getSearchKeywords(inputValue);
+      console.log(
+        'onInputValueChange - inputValue: ',
+        inputValue,
+        ', sqlQuery: ',
+        sqlQuery,
+        ', time: ',
+        time,
+        ', searchKeywords: ',
+        searchKeywords,
+      );
       const hasSQLCommand =
         searchKeywords.findIndex(
           (keyword) =>
@@ -68,25 +75,18 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
         }
 
         if (lastKeyword !== '') {
-          console.log('last keyword: ', lastKeyword);
           newSuggestions = newSuggestions.filter(({ value }) =>
             value.toUpperCase().includes(lastKeyword.toUpperCase()),
           );
+          setHighlightedIndex(newSuggestions.length ? 0 : -1);
         }
       }
 
       setSuggestions(newSuggestions);
     },
-    onSelectedItemChange: ({ selectedItem }) => {
-      // Append selected item to the SQL query
-      // console.log('selected item ====== ', selectedItem);
-      // setSqlQuery((prevQuery) => prevQuery + `${selectedItem.value} `);
-    },
     stateReducer: (state, actionAndChanges) => {
       const { changes, type } = actionAndChanges;
       let newInputValue = state.inputValue;
-
-      console.log('state: ', state, '\nactionAndChanges: ', actionAndChanges);
 
       switch (type) {
         case useCombobox.stateChangeTypes.InputKeyDownEnter:
@@ -99,26 +99,49 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
             if (isEmpty(lastSearchKeyword)) {
               newInputValue = state.inputValue + changes.selectedItem.value + ' ';
             } else {
-              console.log(
-                'state.inputValue: ',
-                state.inputValue,
-                ', lastSearchKeyword: ',
-                lastSearchKeyword,
-                ', newValue: ',
-                changes.selectedItem.value,
-              );
               newInputValue = replaceLast(
                 state.inputValue,
                 lastSearchKeyword,
                 changes.selectedItem.value + ' ',
               );
-              console.log('newInputValue ============ ', newInputValue);
             }
           }
 
           return {
             ...changes,
+            isOpen: false,
             inputValue: newInputValue,
+          };
+        case useCombobox.stateChangeTypes.InputChange:
+          // Set the first item to be highlighted if the last keyword is valid
+          const time = Date.now();
+          const searchKeywords = getSearchKeywords(changes.inputValue);
+          const lastSearchKeyword = searchKeywords[searchKeywords.length - 1];
+
+          console.log(
+            '************************* input change - state: ',
+            state,
+            ', lastSearchKeyword: ',
+            lastSearchKeyword,
+            ', keyword length: ',
+            lastSearchKeyword?.length,
+            ', changes: ',
+            changes,
+            ', suggestions: ',
+            suggestions,
+            ', time',
+            time,
+          );
+
+          return {
+            ...changes,
+            // highlightedIndex:
+            //   changes.isOpen &&
+            //   suggestions.length > 0 &&
+            //   changes.highlightedIndex === -1 &&
+            //   lastSearchKeyword !== ''
+            //     ? 0
+            //     : changes.highlightedIndex,
           };
         default:
           return changes;
@@ -128,8 +151,8 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
 
   const onInputKeyDown = useCallback(
     (event) => {
-      console.log('================= input key down event: ', event);
       switch (event.key) {
+        // Select the highlighted item
         case 'Tab':
           event.preventDefault();
           highlightedIndex > -1 && selectItem(suggestions[highlightedIndex]);
@@ -140,26 +163,6 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
     },
     [highlightedIndex, suggestions, selectItem],
   );
-
-  // Ensure highlightedIndex is set to 0 if it's -1
-  // useEffect(() => {
-  //   if (highlightedIndex === -1 && suggestions.length > 0) {
-  //     setHighlightedIndex(0);
-  //   }
-  // }, [highlightedIndex, suggestions]);
-
-  // console.log(
-  //   'getInputProps: ',
-  //   { ...getInputProps() },
-  //   '\nhightlighted Index: ',
-  //   highlightedIndex,
-  //   '\nselectedItem: ',
-  //   selectedItem,
-  //   '\ngetMenuProps',
-  //   { ...getMenuProps() },
-  //   '\ngetItemProps: ',
-  //   suggestions.map((item, index) => ({ ...getItemProps({ item, index }) })),
-  // );
 
   return (
     <div>
