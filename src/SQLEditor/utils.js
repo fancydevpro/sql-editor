@@ -39,11 +39,9 @@ const getSearchKeywords = (query) => {
 
   if (adjustedQuery === '') return [];
 
-  console.log('adjusted query: ', adjustedQuery);
-
   const keywords = splitBySpaceAndComma(adjustedQuery);
 
-  if (query[query.length - 1] === ' ') {
+  if (query[query.length - 1] === ' ' || query[query.length - 1] === '\n') {
     return [...keywords, ''];
   }
 
