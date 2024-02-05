@@ -33,7 +33,12 @@ const splitBySpaceAndComma = (string) => {
 const getSearchKeywords = (query) => {
   if (isEmpty(query)) return [];
 
-  let adjustedQuery = removeDuplicatedSpaces(query, true);
+  const snipts = query.split(';');
+  let adjustedQuery = snipts[snipts.length - 1];
+
+  if (isEmpty(adjustedQuery)) return [];
+
+  adjustedQuery = removeDuplicatedSpaces(adjustedQuery, true);
   adjustedQuery = removeDuplicatedCommas(adjustedQuery);
   adjustedQuery = adjustedQuery.replace(/\s*,+\s*/g, ',');
 
