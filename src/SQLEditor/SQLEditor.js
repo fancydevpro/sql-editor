@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useCombobox } from 'downshift';
 import { isEmpty, keys, without } from 'lodash';
+import getCaretCoordinates from 'textarea-caret';
 import { getSearchKeywords, replaceLast } from './utils';
-
-// downshiftUseComboboxReducer
+import './SQLEditor.css';
 
 const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
   const [sqlQuery, setSqlQuery] = useState('');
@@ -17,6 +17,37 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
       })),
     [data],
   );
+  const [suggestionListTopPos, setSuggestionListTopPos] = useState(0);
+  const [suggestionListLeftPos, setSuggestionListLeftPos] = useState(0);
+  const inputRef = useRef(null);
+
+  const updateCaretPos = useCallback(() => {
+    const searchKeywords = getSearchKeywords(inputRef.current.value);
+
+    const selIndex =
+      searchKeywords.length === 0 || searchKeywords[searchKeywords.length - 1] === ''
+        ? inputRef.current.selectionEnd
+        : inputRef.current.value.lastIndexOf(searchKeywords[searchKeywords.length - 1]);
+
+    const caretPos = getCaretCoordinates(inputRef.current, selIndex);
+    console.log(
+      '------------------ caretPos: ',
+      caretPos,
+      ', selectionEnd: ',
+      inputRef.current.selectionEnd,
+    );
+    const inputStyle = window.getComputedStyle(inputRef.current);
+    const newTopPos = caretPos.top + caretPos.height + window.scrollY;
+    const newLeftPos = Math.abs(
+      caretPos.left -
+        Number.parseInt(inputStyle.borderLeftWidth) -
+        Number.parseInt(inputStyle.paddingLeft) +
+        window.scrollX,
+    );
+
+    setSuggestionListTopPos(newTopPos);
+    setSuggestionListLeftPos(newLeftPos);
+  }, []);
 
   const {
     isOpen,
@@ -31,7 +62,6 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
     itemToString: (item) => item?.value || '',
     onInputValueChange: ({ inputValue }) => {
       // Update the SQL query with the current input value
-      const time = Date.now();
       setSqlQuery(inputValue);
 
       // Keywords arrary
@@ -39,13 +69,10 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
       console.log(
         'onInputValueChange - inputValue: ',
         inputValue,
-        ', sqlQuery: ',
-        sqlQuery,
-        ', time: ',
-        time,
         ', searchKeywords: ',
         searchKeywords,
       );
+
       const hasSQLCommand =
         searchKeywords.findIndex(
           (keyword) =>
@@ -82,6 +109,7 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
         }
       }
 
+      updateCaretPos();
       setSuggestions(newSuggestions);
     },
     stateReducer: (state, actionAndChanges) => {
@@ -112,37 +140,6 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
             isOpen: false,
             inputValue: newInputValue,
           };
-        case useCombobox.stateChangeTypes.InputChange:
-          // Set the first item to be highlighted if the last keyword is valid
-          const time = Date.now();
-          const searchKeywords = getSearchKeywords(changes.inputValue);
-          const lastSearchKeyword = searchKeywords[searchKeywords.length - 1];
-
-          console.log(
-            '************************* input change - state: ',
-            state,
-            ', lastSearchKeyword: ',
-            lastSearchKeyword,
-            ', keyword length: ',
-            lastSearchKeyword?.length,
-            ', changes: ',
-            changes,
-            ', suggestions: ',
-            suggestions,
-            ', time',
-            time,
-          );
-
-          return {
-            ...changes,
-            // highlightedIndex:
-            //   changes.isOpen &&
-            //   suggestions.length > 0 &&
-            //   changes.highlightedIndex === -1 &&
-            //   lastSearchKeyword !== ''
-            //     ? 0
-            //     : changes.highlightedIndex,
-          };
         default:
           return changes;
       }
@@ -164,21 +161,45 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
     [highlightedIndex, suggestions, selectItem],
   );
 
+  useEffect(() => {
+    if (inputRef.current && isEmpty(inputRef.current.value)) {
+      // Initialize the menu top position
+      updateCaretPos();
+    }
+
+    // Handle input's resize
+    const resizeObserver = new ResizeObserver(updateCaretPos);
+    resizeObserver.observe(inputRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [updateCaretPos]);
+
   return (
-    <div>
+    <div className='Container'>
       <div>
         <textarea
           {...getInputProps({
             onKeyDown: onInputKeyDown,
           })}
-          value={sqlQuery}
           placeholder='Enter your SQL query...'
+          ref={inputRef}
+          className='Input'
         />
       </div>
-      <ul {...getMenuProps()}>
-        {isOpen &&
-          suggestions.map((item, index) => (
+      {isOpen && suggestions.length > 0 && (
+        <ul
+          {...getMenuProps()}
+          className='Suggestions'
+          style={{
+            top: suggestionListTopPos,
+            left: suggestionListLeftPos,
+          }}
+        >
+          {suggestions.map((item, index) => (
             <li
+              className='SuggestionItem'
               style={{
                 backgroundColor: highlightedIndex === index ? 'lightgray' : 'white',
                 color:
@@ -194,7 +215,8 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
               {item.value}
             </li>
           ))}
-      </ul>
+        </ul>
+      )}
     </div>
   );
 };
