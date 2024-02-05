@@ -1,0 +1,29 @@
+.Container {
+  position: relative;
+}
+
+.Input {
+  line-height: 1.2;
+}
+
+.Suggestions {
+  position: absolute;
+  margin: 0;
+  padding-inline-start: 0;
+  padding: 5px;
+  list-style-type: none;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-height: 240px;
+  max-height: 720px;
+  min-width: 240px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.SuggestionItem {
+  cursor: pointer;
+  padding: 5px;
+  margin: 5px 0;
+}
