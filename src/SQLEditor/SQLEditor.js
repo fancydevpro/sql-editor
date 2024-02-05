@@ -1,25 +1,27 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useCombobox } from 'downshift';
 import { isEmpty, keys, without } from 'lodash';
 import getCaretCoordinates from 'textarea-caret';
 import { getSearchKeywords, replaceLast } from './utils';
 import './SQLEditor.css';
 
-const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
+const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData }) => {
   const [sqlQuery, setSqlQuery] = useState('');
   const [suggestions, setSuggestions] = useState(sqlCommands);
-  const dataFields = useMemo(
-    () =>
-      without(keys(data?.[0]), 'id').map((field) => ({
+  const [suggestionListTopPos, setSuggestionListTopPos] = useState(0);
+  const [suggestionListLeftPos, setSuggestionListLeftPos] = useState(0);
+  const dataRef = useRef(data);
+  const inputRef = useRef(null);
+
+  const normalizeData = useCallback(
+    (newData) =>
+      without(keys(newData?.[0]), 'id').map((field) => ({
         key: field,
         value: field,
         type: 'data',
       })),
-    [data],
+    [],
   );
-  const [suggestionListTopPos, setSuggestionListTopPos] = useState(0);
-  const [suggestionListLeftPos, setSuggestionListLeftPos] = useState(0);
-  const inputRef = useRef(null);
 
   const updateCaretPos = useCallback(() => {
     const searchKeywords = getSearchKeywords(inputRef.current.value);
@@ -49,21 +51,8 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
     setSuggestionListLeftPos(newLeftPos);
   }, []);
 
-  const {
-    isOpen,
-    getMenuProps,
-    getInputProps,
-    highlightedIndex,
-    getItemProps,
-    selectItem,
-    setHighlightedIndex,
-  } = useCombobox({
-    items: suggestions,
-    itemToString: (item) => item?.value || '',
-    onInputValueChange: ({ inputValue }) => {
-      // Update the SQL query with the current input value
-      setSqlQuery(inputValue);
-
+  const updateSuggestions = useCallback(
+    (inputValue) => {
       // Keywords arrary
       const searchKeywords = getSearchKeywords(inputValue);
       console.log(
@@ -88,7 +77,7 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
             ) !== -1,
         ) !== -1;
       const lastKeyword = searchKeywords[searchKeywords.length - 1];
-      let newSuggestions = suggestions;
+      let newSuggestions;
 
       // Filter suggestions based on user input
       if (searchKeywords.length === 0) {
@@ -96,6 +85,7 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
         newSuggestions = sqlCommands;
       } else {
         if (hasSQLCommand) {
+          const dataFields = normalizeData(dataRef.current);
           newSuggestions = dataFields.concat(sqlIndicators, sqlCommands);
         } else {
           newSuggestions = sqlCommands;
@@ -109,8 +99,48 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data }) => {
         }
       }
 
-      updateCaretPos();
       setSuggestions(newSuggestions);
+    },
+    [sqlCommands, sqlIndicators, normalizeData],
+  );
+
+  const updateOnKeywordChange = useCallback(
+    async (keyword, postUpdate) => {
+      if (updateData) {
+        dataRef.current = await updateData(keyword);
+
+        if (postUpdate) {
+          postUpdate();
+        }
+      }
+    },
+    [updateData],
+  );
+
+  const {
+    isOpen,
+    getMenuProps,
+    getInputProps,
+    highlightedIndex,
+    getItemProps,
+    selectItem,
+    setHighlightedIndex,
+  } = useCombobox({
+    items: suggestions,
+    itemToString: (item) => item?.value || '',
+    onInputValueChange: ({ inputValue }) => {
+      // Update the SQL query with the current input value
+      setSqlQuery(inputValue);
+
+      updateSuggestions(inputValue);
+      updateCaretPos();
+
+      const searchKeywords = getSearchKeywords(inputValue);
+      if (searchKeywords.length && searchKeywords[searchKeywords.length - 1]) {
+        updateOnKeywordChange(searchKeywords[searchKeywords.length - 1], () =>
+          updateSuggestions(inputValue),
+        );
+      }
     },
     stateReducer: (state, actionAndChanges) => {
       const { changes, type } = actionAndChanges;
