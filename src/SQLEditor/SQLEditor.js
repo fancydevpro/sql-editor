@@ -32,12 +32,6 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData }) => {
         : inputRef.current.value.lastIndexOf(searchKeywords[searchKeywords.length - 1]);
 
     const caretPos = getCaretCoordinates(inputRef.current, selIndex);
-    console.log(
-      '------------------ caretPos: ',
-      caretPos,
-      ', selectionEnd: ',
-      inputRef.current.selectionEnd,
-    );
     const inputStyle = window.getComputedStyle(inputRef.current);
     const newTopPos = caretPos.top + caretPos.height + window.scrollY;
     const newLeftPos = Math.abs(
@@ -84,18 +78,34 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData }) => {
         // Suggest SQL commands only
         newSuggestions = sqlCommands;
       } else {
-        if (hasSQLCommand) {
-          const dataFields = normalizeData(dataRef.current);
-          newSuggestions = dataFields.concat(sqlIndicators, sqlCommands);
-        } else {
-          newSuggestions = sqlCommands;
-        }
+        const isSubDataField = !isEmpty(lastKeyword) && lastKeyword.includes('.');
+        const isInvalid =
+          !isEmpty(lastKeyword) && (lastKeyword[0] === '.' || lastKeyword.includes('..'));
 
-        if (lastKeyword !== '') {
-          newSuggestions = newSuggestions.filter(({ value }) =>
-            value.toUpperCase().includes(lastKeyword.toUpperCase()),
-          );
-          setHighlightedIndex(newSuggestions.length ? 0 : -1);
+        if (isInvalid) {
+          newSuggestions = [];
+        } else {
+          if (hasSQLCommand) {
+            const dataFields = normalizeData(dataRef.current);
+            newSuggestions = isSubDataField
+              ? dataFields
+              : dataFields.concat(sqlIndicators, sqlCommands);
+          } else {
+            newSuggestions = sqlCommands;
+          }
+
+          if (lastKeyword !== '') {
+            let searchKey = lastKeyword;
+
+            if (isSubDataField) {
+              const snipts = lastKeyword.split('.');
+              searchKey = snipts[snipts.length - 1];
+            }
+            newSuggestions = newSuggestions.filter(({ value }) =>
+              value.toUpperCase().includes(searchKey.toUpperCase()),
+            );
+            setHighlightedIndex(newSuggestions.length ? 0 : -1);
+          }
         }
       }
 
@@ -136,6 +146,7 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData }) => {
       updateCaretPos();
 
       const searchKeywords = getSearchKeywords(inputValue);
+      console.log('search keywords: ', searchKeywords);
       if (searchKeywords.length && searchKeywords[searchKeywords.length - 1]) {
         updateOnKeywordChange(searchKeywords[searchKeywords.length - 1], () =>
           updateSuggestions(inputValue),
@@ -155,13 +166,26 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData }) => {
             const lastSearchKeyword = searchKeywords[searchKeywords.length - 1];
 
             if (isEmpty(lastSearchKeyword)) {
-              newInputValue = state.inputValue + changes.selectedItem.value + ' ';
+              newInputValue = state.inputValue + changes.selectedItem.value;
             } else {
+              let searchKey = lastSearchKeyword;
+              const isSubDataField =
+                !isEmpty(lastSearchKeyword) && lastSearchKeyword.includes('.');
+
+              if (isSubDataField) {
+                const snipts = lastSearchKeyword.split('.');
+                searchKey = snipts[snipts.length - 1];
+              }
+
               newInputValue = replaceLast(
                 state.inputValue,
-                lastSearchKeyword,
-                changes.selectedItem.value + ' ',
+                searchKey,
+                changes.selectedItem.value,
               );
+            }
+
+            if (changes.selectedItem.type !== 'data') {
+              newInputValue += ' ';
             }
           }
 
