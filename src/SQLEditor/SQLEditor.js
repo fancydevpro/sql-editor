@@ -5,7 +5,7 @@ import getCaretCoordinates from 'textarea-caret';
 import { getSearchKeywords, replaceLast } from './utils';
 import './SQLEditor.css';
 
-const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData }) => {
+const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData, rows, cols }) => {
   const [sqlQuery, setSqlQuery] = useState('');
   const [suggestions, setSuggestions] = useState(sqlCommands);
   const [suggestionListTopPos, setSuggestionListTopPos] = useState(0);
@@ -25,11 +25,16 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData }) => {
 
   const updateCaretPos = useCallback(() => {
     const searchKeywords = getSearchKeywords(inputRef.current.value);
+    const lastSearchKeyword = searchKeywords[searchKeywords.length - 1];
+    let selIndex = inputRef.current.selectionEnd;
 
-    const selIndex =
-      searchKeywords.length === 0 || searchKeywords[searchKeywords.length - 1] === ''
-        ? inputRef.current.selectionEnd
-        : inputRef.current.value.lastIndexOf(searchKeywords[searchKeywords.length - 1]);
+    if (!isEmpty(lastSearchKeyword)) {
+      if (lastSearchKeyword.includes('.')) {
+        selIndex = inputRef.current.value.lastIndexOf('.');
+      } else {
+        inputRef.current.value.lastIndexOf(lastSearchKeyword);
+      }
+    }
 
     const caretPos = getCaretCoordinates(inputRef.current, selIndex);
     const inputStyle = window.getComputedStyle(inputRef.current);
@@ -240,6 +245,9 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData }) => {
           placeholder='Enter your SQL query...'
           ref={inputRef}
           className='Input'
+          spellCheck={false}
+          rows={rows}
+          cols={cols}
         />
       </div>
       {isOpen && suggestions.length > 0 && (
@@ -315,6 +323,8 @@ SQLEditor.defaultProps = {
     { id: 'avocados', name: 'Avocados', color: 'green', mass: '100' },
     { id: 'limes', name: 'Limes', color: 'green', mass: '220' },
   ],
+  rows: 3,
+  cols: 40,
 };
 
 export default SQLEditor;
