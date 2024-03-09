@@ -32,7 +32,7 @@ const SQLEditor = ({ sqlCommands, sqlIndicators, data, updateData, rows, cols })
       if (lastSearchKeyword.includes('.')) {
         selIndex = inputRef.current.value.lastIndexOf('.');
       } else {
-        inputRef.current.value.lastIndexOf(lastSearchKeyword);
+        selIndex = inputRef.current.value.lastIndexOf(lastSearchKeyword);
       }
     }
 
